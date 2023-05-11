@@ -1,9 +1,9 @@
 #ifndef GDSQLITE_H
 #define GDSQLITE_H
 
-#include "core/config/engine.h"
-#include "core/object/ref_counted.h"
-#include "core/templates/local_vector.h"
+#include "core/engine.h"
+#include "core/reference.h"
+#include "core/local_vector.h"
 
 // SQLite3
 #include "thirdparty/sqlite/spmemvfs.h"
@@ -11,8 +11,8 @@
 
 class SQLite;
 
-class SQLiteQuery : public RefCounted {
-  GDCLASS(SQLiteQuery, RefCounted);
+class SQLiteQuery : public Reference {
+  GDCLASS(SQLiteQuery, Reference);
 
   SQLite *db = nullptr;
   sqlite3_stmt *stmt = nullptr;
@@ -74,8 +74,8 @@ private:
   bool prepare();
 };
 
-class SQLite : public RefCounted {
-  GDCLASS(SQLite, RefCounted);
+class SQLite : public Reference {
+  GDCLASS(SQLite, Reference);
 
   friend class SQLiteQuery;
 
@@ -109,7 +109,7 @@ public:
   // methods
   bool open(String path);
   bool open_in_memory();
-  bool open_buffered(String name, PackedByteArray buffers, int64_t size);
+  bool open_buffered(String name, PoolByteArray buffers, int64_t size);
   void close();
 
   /// Compiles the query into bytecode and returns an handle to it for a faster
