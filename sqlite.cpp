@@ -1,7 +1,8 @@
 #include "sqlite.h"
-#include "core/core_bind.h"
+#include "core/bind/core_bind.h"
 #include "core/os/os.h"
 #include "editor/project_settings_editor.h"
+#include <stdlib.h>
 
 Array fast_parse_row(sqlite3_stmt *stmt) {
   Array result;
@@ -33,10 +34,10 @@ Array fast_parse_row(sqlite3_stmt *stmt) {
       break;
     }
     case SQLITE_BLOB: {
-      PackedByteArray arr;
+      PoolByteArray arr;
       int size = sqlite3_column_bytes(stmt, i);
       arr.resize(size);
-      memcpy(arr.ptrw(), sqlite3_column_blob(stmt, i), size);
+      memcpy(arr.write().ptr(), sqlite3_column_blob(stmt, i), size);
       value = Variant(arr);
       break;
     }
@@ -198,14 +199,14 @@ bool SQLite::open(String path) {
 
   if (!Engine::get_singleton()->is_editor_hint() &&
       path.begins_with("res://")) {
-    Ref<core_bind::File> dbfile;
-    dbfile.instantiate();
-    if (dbfile->open(path, core_bind::File::READ) != Error::OK) {
+    Ref<_File> dbfile;
+    dbfile.instance();
+    if (dbfile->open(path, _File::READ) != Error::OK) {
       print_error("Cannot open packed database!");
       return false;
     }
-    int64_t size = dbfile->get_length();
-    PackedByteArray buffer = dbfile->get_buffer(size);
+    int64_t size = dbfile->get_len();
+    PoolByteArray buffer = dbfile->get_buffer(size);
     return open_buffered(path, buffer, size);
   }
 
@@ -236,7 +237,7 @@ bool SQLite::open_in_memory() {
   @param size Size of the database;
   @return status
 */
-bool SQLite::open_buffered(String name, PackedByteArray buffers, int64_t size) {
+bool SQLite::open_buffered(String name, PoolByteArray buffers, int64_t size) {
   if (!name.strip_edges().length()) {
     return false;
   }
@@ -248,7 +249,7 @@ bool SQLite::open_buffered(String name, PackedByteArray buffers, int64_t size) {
   spmembuffer_t *p_mem = (spmembuffer_t *)calloc(1, sizeof(spmembuffer_t));
   p_mem->total = p_mem->used = size;
   p_mem->data = (char *)malloc(size + 1);
-  memcpy(p_mem->data, buffers.ptr(), size);
+  memcpy(p_mem->data, buffers.read().ptr(), size);
   p_mem->data[size] = '\0';
 
   //
@@ -274,7 +275,7 @@ void SQLite::close() {
       query->finalize();
     } else {
       memdelete(queries[i - 1]);
-      queries.remove_at(i - 1);
+      queries.remove(i - 1);
     }
   }
 
@@ -340,17 +341,17 @@ bool SQLite::bind_args(sqlite3_stmt *stmt, Array args) {
     case Variant::Type::INT:
       retcode = sqlite3_bind_int(stmt, i + 1, (int)args[i]);
       break;
-    case Variant::Type::FLOAT:
+    case Variant::Type::REAL:
       retcode = sqlite3_bind_double(stmt, i + 1, (double)args[i]);
       break;
     case Variant::Type::STRING:
       retcode = sqlite3_bind_text(
           stmt, i + 1, String(args[i]).utf8().get_data(), -1, SQLITE_TRANSIENT);
       break;
-    case Variant::Type::PACKED_BYTE_ARRAY:
+    case Variant::Type::POOL_BYTE_ARRAY:
       retcode =
-          sqlite3_bind_blob(stmt, i + 1, PackedByteArray(args[i]).ptr(),
-                            PackedByteArray(args[i]).size(), SQLITE_TRANSIENT);
+          sqlite3_bind_blob(stmt, i + 1, PoolByteArray(args[i]).read().ptr(),
+                            PoolByteArray(args[i]).size(), SQLITE_TRANSIENT);
       break;
     default:
       print_error(
@@ -396,7 +397,7 @@ bool SQLite::query_with_args(String query, Array args) {
 
 Ref<SQLiteQuery> SQLite::create_query(String p_query) {
   Ref<SQLiteQuery> query;
-  query.instantiate();
+  query.instance();
   query->init(this, p_query);
 
   WeakRef *wr = memnew(WeakRef);
@@ -477,10 +478,10 @@ Dictionary SQLite::parse_row(sqlite3_stmt *stmt, int result_type) {
       break;
     }
     case SQLITE_BLOB: {
-      PackedByteArray arr;
+      PoolByteArray arr;
       int size = sqlite3_column_bytes(stmt, i);
       arr.resize(size);
-      memcpy((void *)arr.ptr(), sqlite3_column_blob(stmt, i), size);
+      memcpy((void *)arr.write().ptr(), sqlite3_column_blob(stmt, i), size);
       value = Variant(arr);
       break;
     }
